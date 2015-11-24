@@ -12,6 +12,12 @@
 // specific language governing permissions and limitations under the License.
 namespace MassTransit
 {
+    using System;
+    using Builders;
+    using PipeConfigurators;
+    using Pipeline;
+
+
     /// <summary>
     /// Configure a receiving endpoint
     /// </summary>
@@ -20,5 +26,7 @@ namespace MassTransit
     {
         [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
         void AddEndpointSpecification(IReceiveEndpointSpecification configurator);
+
+        void AddReceiveSpecification(Action<IBuildPipeConfigurator<ReceiveContext>> configurator);
     }
 }

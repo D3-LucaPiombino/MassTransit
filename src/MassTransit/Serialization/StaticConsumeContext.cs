@@ -64,8 +64,21 @@ namespace MassTransit.Serialization
             _pendingTasks = new List<Task>();
             _message = message;
             _binaryHeaders = headers;
+            _supportedTypes = GetMessageTypes().ToArray();
+        }
 
-            _supportedTypes = new[] {GetHeaderString(BinaryMessageSerializer.MessageTypeKey)};
+        private IEnumerable<string> GetMessageTypes()
+        {
+            yield return GetHeaderString(BinaryMessageSerializer.MessageTypeKey);
+            var header = GetHeader(BinaryMessageSerializer.AdditionalMessageTypes) as string;
+            if (header != null)
+            {
+                var additionalMessageUrns = header.Split(';');
+                foreach (var additionalMessageUrn in additionalMessageUrns)
+                {
+                    yield return additionalMessageUrn;
+                }
+            }
         }
 
         public bool HasPayloadType(Type contextType)
@@ -245,7 +258,8 @@ namespace MassTransit.Serialization
         public void NotifyFaulted<T>(ConsumeContext<T> context, TimeSpan duration, string consumerType, Exception exception)
             where T : class
         {
-            Task faultTask = GenerateFault(context, exception);
+            // LP: Pass context.Message NOT context.
+            Task faultTask = GenerateFault(context.Message, exception);
 
             _pendingTasks.Add(faultTask);
 

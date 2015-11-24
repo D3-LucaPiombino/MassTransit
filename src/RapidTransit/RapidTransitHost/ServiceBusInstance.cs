@@ -12,6 +12,7 @@
 // specific language governing permissions and limitations under the License.
 namespace RapidTransit
 {
+    using System;
     using System.Collections.Generic;
     using System.Configuration;
     using Configuration;
@@ -52,6 +53,11 @@ namespace RapidTransit
         void IReceiveEndpointConfigurator.AddEndpointSpecification(IReceiveEndpointSpecification configurator)
         {
             _configurators.Add(configurator);
+        }
+
+        public void AddReceiveSpecification(Action<IBuildPipeConfigurator<ReceiveContext>> configurator)
+        {
+            throw new NotImplementedException();
         }
 
         void IPipeConfigurator<ConsumeContext>.AddPipeSpecification(IPipeSpecification<ConsumeContext> specification)

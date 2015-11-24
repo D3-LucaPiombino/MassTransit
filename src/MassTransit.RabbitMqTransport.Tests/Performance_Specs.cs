@@ -18,6 +18,8 @@ namespace MassTransit.RabbitMqTransport.Tests
     using System.Threading;
     using System.Threading.Tasks;
     using NUnit.Framework;
+    using RabbitMQ.Client;
+    using TestFramework;
     using TestFramework.Messages;
 
 
@@ -79,5 +81,89 @@ namespace MassTransit.RabbitMqTransport.Tests
                 }
             });
         }
+    }
+
+
+    [TestFixture, Explicit]
+    public class Performance_of_the_RabbitMQ_transport2 :
+        AsyncTestFixture
+    {
+        [Test]
+        public async Task Should_be_wicked_fast()
+        {
+            var handle = MassTransit.Bus.Factory.CreateUsingRabbitMq(x =>
+            {
+                //ConfigureBus(x);
+
+                IRabbitMqHost host = x.Host(new Uri("rabbitmq://localhost/LI-223/"), h =>
+                {
+                    h.Username("guest");
+                    h.Password("guest");
+                });
+
+                CleanUpVirtualHost(host);
+
+                for (int i = 0; i < 40; i++)
+                {
+
+                    x.ReceiveEndpoint(host, string.Format("input_queue_{0}", i), e =>
+                    {
+                        //e.PrefetchCount = 16;
+                        //e.PurgeOnStartup();
+                        e.Handler<TestMessage>(ctx =>
+                        {
+                            return Task.FromResult(true);
+                        });
+                    });
+                }
+                
+            });
+
+            var busControl = handle.Start();
+
+            var sw = Stopwatch.StartNew();
+            while (true)
+            {
+                await Task.Delay(1000);
+                int maxWorker, maxIoCompletion, availableWorkers, availableIoCompletion;
+
+                ThreadPool.GetAvailableThreads(out availableWorkers, out availableIoCompletion);
+                ThreadPool.GetMaxThreads(out maxWorker, out maxIoCompletion);
+                Console.WriteLine(
+                    "[{0}] Pooled Threads(Worker/IO Completion): {1} / {2}",
+                    sw.Elapsed,
+                    maxWorker - availableWorkers, 
+                    maxIoCompletion - availableIoCompletion
+                );
+            }
+
+            await busControl.Stop();
+
+        }
+        void CleanUpVirtualHost(IRabbitMqHost host)
+        {
+
+            ConnectionFactory connectionFactory = host.Settings.GetConnectionFactory();
+            using (IConnection connection = connectionFactory.CreateConnection())
+            using (IModel model = connection.CreateModel())
+            {
+                for (int i = 0; i < 100; i++)
+                {
+                    var qname = string.Format("input_queue_{0}", i);
+                    model.ExchangeDelete(qname);
+                    model.QueueDelete(qname);    
+                }
+                
+
+                //OnCleanupVirtualHost(model);
+            }
+        }
+
+        class TestMessage
+        {
+            
+        }
+
+       
     }
 }

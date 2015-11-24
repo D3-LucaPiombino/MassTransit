@@ -15,6 +15,7 @@ namespace MassTransit.Tests.Transports
     namespace InMemoryTransport_Specs
     {
         using System;
+        using System.Diagnostics;
         using System.Threading;
         using System.Threading.Tasks;
         using MassTransit.Pipeline;
@@ -64,9 +65,57 @@ namespace MassTransit.Tests.Transports
 
                 await receiveHandle.Stop();
             }
+
+            [Test]
+            public async Task Should_be_wicked_fast()
+            {
+                var handle = MassTransit.Bus.Factory.CreateUsingInMemory(x =>
+                {
+
+                    for (int i = 0; i < 2; i++)
+                    {
+
+                        x.ReceiveEndpoint(string.Format("input_queue_{0}", i), e =>
+                        {
+                            //e.PrefetchCount = 16;
+                            //e.PurgeOnStartup();
+                            e.Handler<TestMessage>(ctx =>
+                            {
+                                return Task.FromResult(true);
+                            });
+                        });
+                    }
+
+                });
+
+                var busControl = handle.Start();
+                
+                var sw = Stopwatch.StartNew();
+                while (true)
+                {
+                    await Task.Delay(1000);
+                    int maxWorker, maxIoCompletion, availableWorkers, availableIoCompletion;
+
+                    ThreadPool.GetAvailableThreads(out availableWorkers, out availableIoCompletion);
+                    ThreadPool.GetMaxThreads(out maxWorker, out maxIoCompletion);
+                    Console.WriteLine(
+                        "[{0}] Pooled Threads(Worker/IO Completion): {1} / {2}",
+                        sw.Elapsed,
+                        maxWorker - availableWorkers,
+                        maxIoCompletion - availableIoCompletion
+                    );
+                }
+                
+                await busControl.Stop();
+
+            }
         }
 
-
+        
+        class TestMessage
+        {
+            
+        }
         class A
         {
         }

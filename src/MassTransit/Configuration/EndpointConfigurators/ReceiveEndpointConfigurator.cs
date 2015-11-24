@@ -32,12 +32,14 @@ namespace MassTransit.EndpointConfigurators
         readonly ConsumePipeSpecificationList _consumePipeSpecification;
         readonly IBuildPipeConfigurator<ReceiveContext> _receiveConfigurator;
         readonly IList<IReceiveEndpointSpecification> _specifications;
+        readonly IList<Action<IBuildPipeConfigurator<ReceiveContext>>> _receiveSpecifications;
 
         protected ReceiveEndpointConfigurator(IConsumePipe consumePipe)
         {
             _consumePipe = consumePipe;
 
             _specifications = new List<IReceiveEndpointSpecification>();
+            _receiveSpecifications = new List<Action<IBuildPipeConfigurator<ReceiveContext>>>();
             _consumePipeSpecification = new ConsumePipeSpecificationList();
             _receiveConfigurator = new PipeConfigurator<ReceiveContext>();
         }
@@ -62,6 +64,11 @@ namespace MassTransit.EndpointConfigurators
             _specifications.Add(configurator);
         }
 
+        public void AddReceiveSpecification(Action<IBuildPipeConfigurator<ReceiveContext>> configurator)
+        {
+            _receiveSpecifications.Add(configurator);
+        }
+
         protected IPipe<ReceiveContext> CreateReceivePipe(IBusBuilder builder, Func<IConsumePipe, IReceiveEndpointBuilder> endpointBuilderFactory)
         {
             IConsumePipe consumePipe = _consumePipe ?? builder.CreateConsumePipe(_consumePipeSpecification);
@@ -72,6 +79,12 @@ namespace MassTransit.EndpointConfigurators
                 specification.Configure(endpointBuilder);
 
             // TODO insert dead-letter filter so that no message consumers moves to "_skipped"
+            
+            
+            foreach (var receiveSpecification in _receiveSpecifications)
+            {
+                receiveSpecification(_receiveConfigurator);
+            }
 
             ConfigureRescueFilter(builder);
 

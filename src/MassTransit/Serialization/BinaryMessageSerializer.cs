@@ -15,6 +15,7 @@ namespace MassTransit.Serialization
     using System;
     using System.Collections.Generic;
     using System.IO;
+    using System.Linq;
     using System.Net.Mime;
     using System.Runtime.Remoting.Messaging;
     using System.Runtime.Serialization.Formatters.Binary;
@@ -38,6 +39,8 @@ namespace MassTransit.Serialization
         public const string RequestIdKey = "RequestId";
         public const string ResponseAddressKey = "ResponseAddress";
         public const string SourceAddressKey = "SourceAddress";
+        public const string AdditionalMessageTypes = "AdditionalMessageTypes";
+
         public static readonly ContentType BinaryContentType = new ContentType(ContentTypeHeaderValue);
 
         static readonly BinaryFormatter _formatter = new BinaryFormatter();
@@ -56,7 +59,7 @@ namespace MassTransit.Serialization
                         TypeMetadataCache<T>.ShortName));
             }
 
-            _formatter.Serialize(stream, context.Message, GetHeaders(context, new MessageUrn(typeof(T))));
+            _formatter.Serialize(stream, context.Message, GetHeaders<T>(context, new MessageUrn(typeof(T))));
 
             context.ContentType = BinaryContentType;
         }
@@ -66,11 +69,14 @@ namespace MassTransit.Serialization
             get { return BinaryContentType; }
         }
 
-        static Header[] GetHeaders(SendContext context, MessageUrn messageType)
+        static Header[] GetHeaders<T>(SendContext context, MessageUrn messageType)
         {
             var headers = new List<Header>();
 
+            
             headers.Add(MessageTypeKey, messageType);
+
+            headers.Add(new Header(AdditionalMessageTypes, string.Join(";",TypeMetadataCache<T>.MessageTypeNames)));
 
             if (context.CorrelationId.HasValue)
                 headers.Add(RequestIdKey, context.CorrelationId.Value.ToString("N"));

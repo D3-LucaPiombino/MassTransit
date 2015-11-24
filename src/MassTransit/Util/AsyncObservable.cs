@@ -58,7 +58,9 @@ namespace MassTransit.Util
 
             long id = Interlocked.Increment(ref _nextId);
 
+            //var handle = new Handle(id, observer, Disconnect);
             var handle = new Handle(id, observer, Disconnect);
+            
 
             bool added = _connections.TryAdd(id, handle);
             if (!added)
@@ -90,8 +92,7 @@ namespace MassTransit.Util
             _connections.TryRemove(id, out ignored);
         }
 
-
-        class Handle :
+        class BlockingHandle :
             ObserverHandle
         {
             static readonly ILog _log = Logger.Get<AsyncObservable<T>>();
@@ -102,7 +103,7 @@ namespace MassTransit.Util
             readonly Task _notifyTask;
             readonly T _observer;
 
-            public Handle(long id, T observer, Action<long> disconnect)
+            public BlockingHandle(long id, T observer, Action<long> disconnect)
             {
                 _id = id;
                 _disconnect = disconnect;
@@ -140,6 +141,84 @@ namespace MassTransit.Util
                     {
                         foreach (ObserverNotification notification in _notifications.GetConsumingEnumerable(_cancellation.Token))
                         {
+                            if (_cancellation.Token.IsCancellationRequested)
+                                break;
+
+                            try
+                            {
+                                await notification(_observer).ConfigureAwait(false);
+                            }
+                            catch (Exception ex)
+                            {
+                                _log.Error(string.Format("The {0} observer threw an exception", TypeMetadataCache<T>.ShortName), ex);
+                            }
+                        }
+                    }
+                    catch (OperationCanceledException)
+                    {
+                    }
+                }, _cancellation.Token);
+            }
+        }
+        class Handle :
+            ObserverHandle
+        {
+            static readonly ILog _log = Logger.Get<AsyncObservable<T>>();
+            readonly CancellationTokenSource _cancellation;
+            readonly Action<long> _disconnect;
+            readonly long _id;
+            readonly Task _notifyTask;
+            readonly T _observer;
+            readonly SemaphoreSlim _semaphoreSlim;
+            readonly ConcurrentQueue<ObserverNotification> _queue;
+
+            public Handle(long id, T observer, Action<long> disconnect)
+            {
+                _id = id;
+                _disconnect = disconnect;
+                _observer = observer;
+
+                _cancellation = new CancellationTokenSource();
+                _semaphoreSlim = new SemaphoreSlim(0);
+                _queue = new ConcurrentQueue<ObserverNotification>();
+
+                _notifyTask = StartNotificationTask();
+            }
+
+            public Task Disconnect()
+            {
+                _disconnect(_id);
+
+                _cancellation.Cancel();
+
+                return _notifyTask;
+            }
+
+            public void Notify(ObserverNotification notification)
+            {
+                _queue.Enqueue(notification);
+                _semaphoreSlim.Release();
+            }
+
+            Task StartNotificationTask()
+            {
+                return Task.Run(async () =>
+                {
+                    try
+                    {
+                        while (true)
+                        {
+
+                            await _semaphoreSlim.WaitAsync(_cancellation.Token).ConfigureAwait(false);
+
+                            ObserverNotification notification;
+                            if (!_queue.TryDequeue(out notification))
+                            {
+                                _log.ErrorFormat("The {0} observer semaphore was released, but no message was found in the queue.", 
+                                    TypeMetadataCache<T>.ShortName
+                                );
+                            }
+
                             if (_cancellation.Token.IsCancellationRequested)
                                 break;
 

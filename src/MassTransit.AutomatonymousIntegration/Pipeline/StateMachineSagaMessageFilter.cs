@@ -78,6 +78,7 @@ namespace Automatonymous.Pipeline
             {
                 _log.DebugFormat("{0} {1} in {2} does not accept {3}", _stateMachine.GetType().Name, context.Saga.CorrelationId,
                     currentState.Name, _event.Name);
+                await _stateMachine.RaiseEvent(eventContext).ConfigureAwait(false);
             }
         }
     }
