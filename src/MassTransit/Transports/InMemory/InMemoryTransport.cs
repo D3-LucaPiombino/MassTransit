@@ -35,7 +35,7 @@ namespace MassTransit.Transports.InMemory
         ISendTransport,
         IDisposable
     {
-        static readonly ILog _log = Logger.Get<InMemoryTransport2>();
+        static readonly ILog _log = Logger.Get<InMemoryTransport_Old>();
 
         readonly BlockingCollection<InMemoryTransportMessage> _collection;
         readonly Uri _inputAddress;
@@ -43,7 +43,7 @@ namespace MassTransit.Transports.InMemory
         readonly ReceiveObservable _receiveObservers;
         ConcurrentQueue<InMemoryTransportMessage> _queue;
 
-        public InMemoryTransport2(Uri inputAddress)
+        public InMemoryTransport_Old(Uri inputAddress)
         {
             _inputAddress = inputAddress;
 
