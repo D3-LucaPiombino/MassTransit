@@ -48,8 +48,21 @@ namespace MassTransit.Serialization
             _messageTypes = new Dictionary<Type, object>();
             _message = message;
             _binaryHeaders = headers;
-
-            _supportedTypes = new[] {GetHeaderString(BinaryMessageSerializer.MessageTypeKey)};
+            _supportedTypes = GetSupportedMessageTypes().ToArray();
+        }
+		
+		private IEnumerable<string> GetSupportedMessageTypes()
+        {
+            yield return GetHeaderString(BinaryMessageSerializer.MessageTypeKey);
+            var header = GetHeaderString(BinaryMessageSerializer.PolymorphicMessageTypesKey);
+            if (header != null)
+            {
+                var additionalMessageUrns = header.Split(';');
+                foreach (var additionalMessageUrn in additionalMessageUrns)
+                {
+                    yield return additionalMessageUrn;
+                }
+            }
         }
 
         public override Guid? MessageId => _messageId.HasValue ? _messageId : (_messageId = GetHeaderGuid(BinaryMessageSerializer.MessageIdKey));
