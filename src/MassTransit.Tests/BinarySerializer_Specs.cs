@@ -174,7 +174,7 @@ namespace MassTransit.Tests
             {
                 x.SetTransportProvider(inMemoryTransportCache);
                 x.SupportBinaryMessageDeserializer();
-                x.UseFilter(new SerializerNegotiatorForFaultContextInjectorFilter());
+                x.UseFilter(new FaultSerializerNegotiatorInjectorFilter());
                 configureBusSerializer(x);
 
                 x.ReceiveEndpoint("input_queue", configurator =>
@@ -284,13 +284,13 @@ namespace MassTransit.Tests
 
     /// <summary>
     /// Inject into the pipeline and wrap the <see cref="ConsumeContext"/> with a
-    /// <see cref="SerializerNegotiatorForFaultConsumeContextDecorator"/>
+    /// <see cref="FaultSerializerNegotiatorConsumeContextDecorator"/>
     /// </summary>
-    public class SerializerNegotiatorForFaultContextInjectorFilter : IFilter<ConsumeContext>
+    public class FaultSerializerNegotiatorInjectorFilter : IFilter<ConsumeContext>
     {
         public async Task Send(ConsumeContext context, IPipe<ConsumeContext> next)
         {
-            var decoratedContext = new SerializerNegotiatorForFaultConsumeContextDecorator(context);
+            var decoratedContext = new FaultSerializerNegotiatorConsumeContextDecorator(context);
             await next.Send(decoratedContext);
             await decoratedContext.CompleteTask;
         }
@@ -355,13 +355,13 @@ namespace MassTransit.Tests
     ///    using the BinarySerializer (normally because the JsonSerializer does not support the type) 
     ///    the message should probably be serialized again using the same kind of serialization. 
     /// </remarks>
-    public class SerializerNegotiatorForFaultConsumeContextDecorator : ConsumeContext
+    public class FaultSerializerNegotiatorConsumeContextDecorator : ConsumeContext
     {
         readonly IList<Task> _pendingTasks = new List<Task>();
 
         private readonly ConsumeContext _context;
 
-        public SerializerNegotiatorForFaultConsumeContextDecorator(ConsumeContext context)
+        public FaultSerializerNegotiatorConsumeContextDecorator(ConsumeContext context)
         {
             if (context == null)
                 throw new ArgumentNullException("context");
@@ -543,7 +543,7 @@ namespace MassTransit.Tests
             {
                 // If the context become typed, we need to make sure to also decorate it else
                 // this wont work.
-                consumeContext = new SerializerNegotiatorForFaultConsumeContextDecorator<T>(consumeContext);
+                consumeContext = new FaultSerializerNegotiatorConsumeContextDecorator<T>(consumeContext);
                 return true;
             }
             return false;
@@ -606,6 +606,7 @@ namespace MassTransit.Tests
             sendContext.RequestId = context.RequestId;
 
             NegotiateSerializer(receiveContext, sendContext);
+            // RabbitMQ break when serializing the headers if we dont do this...:(
             ConvertHeadersToString(context.Headers, sendContext);
         }
 
@@ -615,6 +616,26 @@ namespace MassTransit.Tests
             if (receiveContext.ContentType.Equals(BinaryMessageSerializer.BinaryContentType))
             {
                 sendContext.Serializer = new BinaryMessageSerializer();
+            }
+            else if (receiveContext.ContentType.Equals(JsonMessageSerializer.JsonContentType))
+            {
+                sendContext.Serializer = new JsonMessageSerializer();
+            }
+            else if (receiveContext.ContentType.Equals(BsonMessageSerializer.BsonContentType))
+            {
+                sendContext.Serializer = new BsonMessageSerializer();
+            }
+            else if (receiveContext.ContentType.Equals(XmlMessageSerializer.XmlContentType))
+            {
+                sendContext.Serializer = new XmlMessageSerializer();
+            }
+            else if (receiveContext.ContentType.Equals(EncryptedMessageSerializer.EncryptedContentType))
+            {
+                // TODO: here even if we use another serializer and the operation succeed, we risk publishing 
+                // sensible data. 
+                // We dont have the crypto stream provider to create an EncryptedMessageSerializer. 
+                // What is the best way to handle this?
+                sendContext.Serializer = null;
             }
         }
 
@@ -631,16 +652,17 @@ namespace MassTransit.Tests
                     sendContext.Headers.Set(header.Key, header.Value.ToString());
                 }
                 // ignore others
+                // TODO: we are discarding data here! log at least something!
             }
         }
     }
-    public class SerializerNegotiatorForFaultConsumeContextDecorator<T> :
-        SerializerNegotiatorForFaultConsumeContextDecorator, ConsumeContext<T>
+    public class FaultSerializerNegotiatorConsumeContextDecorator<T> :
+        FaultSerializerNegotiatorConsumeContextDecorator, ConsumeContext<T>
         where T : class
     {
         private readonly ConsumeContext<T> _context;
 
-        public SerializerNegotiatorForFaultConsumeContextDecorator(ConsumeContext<T> context) :
+        public FaultSerializerNegotiatorConsumeContextDecorator(ConsumeContext<T> context) :
             base(context)
         {
             _context = context;
