@@ -104,9 +104,9 @@ namespace MassTransit.RabbitMqTransport.Integration
                 var connectionContext = new RabbitMqConnectionContext(connection, _settings, cancellationToken);
 
                 connectionContext.GetOrAddPayload(() => _settings);
-
+                
                 if (_log.IsDebugEnabled)
-                    _log.DebugFormat("Connected to {0} using local address {1}", connection.RemoteEndPoint, connection.LocalEndPoint);
+                    _log.DebugFormat("Connected to {0} using local address :{1}", connection.Endpoint, connection.LocalPort);
 
                 scope.Connected(connectionContext);
             }

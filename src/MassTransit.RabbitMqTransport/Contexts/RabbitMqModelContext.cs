@@ -209,7 +209,7 @@ namespace MassTransit.RabbitMqTransport.Contexts
                     return pendingPublish;
                 });
 
-                _model.BasicPublish(exchange, routingKey, mandatory, immediate, basicProperties, body);
+                _model.BasicPublish(exchange, routingKey, mandatory, basicProperties, body);
             }
             catch
             {
