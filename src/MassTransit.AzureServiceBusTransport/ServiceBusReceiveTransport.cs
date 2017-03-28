@@ -85,7 +85,8 @@ namespace MassTransit.AzureServiceBusTransport
 
         async Task Receiver(CancellationToken stopTokenSource, IPipe<ConnectionContext> connectionPipe)
         {
-            await Repeat.UntilCancelled(stopTokenSource, async () =>
+            var retryPolicy = new UntilCancelledWithDelayRepeatPolicy(stopTokenSource);
+            await Repeat.UntilCancelled(stopTokenSource, retryPolicy, async() =>
             {
                 if (_log.IsDebugEnabled)
                     _log.DebugFormat("Connecting receive transport: {0}", _host.Settings.GetInputAddress(_settings.QueueDescription));

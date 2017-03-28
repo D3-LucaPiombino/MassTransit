@@ -25,9 +25,12 @@ namespace MassTransit.RabbitMqTransport
     using Transports;
 
 
+    
+
     public class RabbitMqReceiveTransport :
         IReceiveTransport
     {
+
         static readonly ILog _log = Logger.Get<RabbitMqReceiveTransport>();
 
         readonly IConnectionCache _connectionCache;
@@ -74,9 +77,12 @@ namespace MassTransit.RabbitMqTransport
             return _receiveObservers.Connect(observer);
         }
 
+        
+
         async Task Receiver(IPipe<ConnectionContext> transportPipe, CancellationToken stopToken)
         {
-            await Repeat.UntilCancelled(stopToken, async () =>
+            var retryPolicy = new UntilCancelledWithDelayRepeatPolicy(stopToken);
+            await Repeat.UntilCancelled(stopToken, retryPolicy, async () =>
             {
                 try
                 {

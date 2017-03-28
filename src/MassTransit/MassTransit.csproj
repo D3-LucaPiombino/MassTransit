@@ -518,6 +518,7 @@
     <Compile Include="Policies\RetryExceptRetryExceptionFilter.cs" />
     <Compile Include="Policies\RetrySelectedRetryExceptionFilter.cs" />
     <Compile Include="Policies\UntilCancelledRepeatContext.cs" />
+    <Compile Include="Policies\UntilCancelledWithDelayRepeatPolicy.cs" />
     <Compile Include="Policies\UntilCancelledRepeatPolicy.cs" />
     <Compile Include="ProbeContext.cs" />
     <Compile Include="ProbeContextExtensions.cs" />

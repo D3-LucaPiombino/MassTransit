@@ -29,12 +29,18 @@ namespace MassTransit.Policies
             return new UntilCancelledRepeatPolicy(cancellationToken);
         }
 
-        public static async Task UntilCancelled(CancellationToken cancellationToken, Func<Task> callback)
+        public static Task UntilCancelled(CancellationToken cancellationToken, Func<Task> callback)
         {
-            IRepeatPolicy repeatPolicy = UntilCancelled(cancellationToken);
-            using (IRepeatContext repeatContext = repeatPolicy.GetRepeatContext())
+            var repeatPolicy = UntilCancelled(cancellationToken);
+            return UntilCancelled(cancellationToken, repeatPolicy, callback);
+        }
+
+        public static async Task UntilCancelled(CancellationToken cancellationToken, IRepeatPolicy repeatPolicy, Func<Task> callback)
+        {
+            
+            using (var repeatContext = repeatPolicy.GetRepeatContext())
             {
-                TimeSpan delay = TimeSpan.Zero;
+                var delay = TimeSpan.Zero;
                 do
                 {
                     if (delay > TimeSpan.Zero)
